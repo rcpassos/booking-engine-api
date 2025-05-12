@@ -6,3 +6,4 @@ pydantic
 python-dotenv
 pytest
 flake8
+passlib[bcrypt]
