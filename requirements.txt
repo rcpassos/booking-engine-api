@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pymongo
+python-jose[cryptography]
+pydantic
+python-dotenv
+pytest
+flake8
