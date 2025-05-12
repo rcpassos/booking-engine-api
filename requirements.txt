@@ -2,8 +2,11 @@ fastapi
 uvicorn[standard]
 pymongo
 python-jose[cryptography]
-pydantic
+pydantic-settings
 python-dotenv
 pytest
 flake8
 passlib[bcrypt]
+httpx
+email-validator
+python-multipart
