@@ -2,7 +2,7 @@ from app.db import users
 from app.models.user import UserIn
 from app.auth.hash import hash_password
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def register_user(data: UserIn) -> dict:
@@ -13,7 +13,7 @@ def register_user(data: UserIn) -> dict:
         "email": data.email,
         "hashed_password": hash_password(data.password),
         "full_name": data.full_name,
-        "created_at": datetime.now(datetime.timezone.utc),
+        "created_at": datetime.now(timezone.utc),
     }
     users.insert_one(user)
     return user

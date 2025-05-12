@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, Body, status
 from fastapi.security import OAuth2PasswordRequestForm
-from datetime import datetime, timedelta
+from datetime import timedelta
+from pydantic import EmailStr
 
 from app.config import settings
 from app.auth.jwt import ALGORITHM, create_access_token
@@ -44,7 +45,7 @@ def login(form: OAuth2PasswordRequestForm = Depends()):
 
 # -- Recover password --
 @app.post("/auth/recover-password")
-def recover_password(email: str):
+def recover_password(email: EmailStr = Body(..., embed=True)):
     user = users.find_one({"email": email})
     if not user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
@@ -106,8 +107,8 @@ def change_password(data: PasswordUpdate, user_id: str = Depends(get_current_use
 
 # --- Booking(Command) ---
 @app.post("/bookings", status_code=201)
-def create_booking(slot: datetime, user_id: str = Depends(get_current_user)):
-    booking = handle_create_booking(user_id, slot.isoformat())
+def create_booking(slot: str, user_id: str = Depends(get_current_user)):
+    booking = handle_create_booking(user_id, slot)
     return booking
 
 
