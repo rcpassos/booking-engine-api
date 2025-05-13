@@ -15,6 +15,7 @@ A white-label, appointment-booking backend built with FastAPI, MongoDB (PyMongo)
    - [Clone & Install](#clone--install)
    - [Environment Variables](#environment-variables)
    - [Run Locally](#run-locally)
+   - [Run with Docker](#run-with-docker)
 
 5. [Usage](#usage)
 
@@ -22,6 +23,9 @@ A white-label, appointment-booking backend built with FastAPI, MongoDB (PyMongo)
    - [Booking Endpoints](#booking-endpoints)
 
 6. [Testing](#testing)
+
+   - [with Docker](#with-docker)
+
 7. [CI/CD](#cicd)
 8. [Folder Structure](#folder-structure)
 9. [Extending & Customizing](#extending--customizing)
@@ -48,6 +52,7 @@ A white-label, appointment-booking backend built with FastAPI, MongoDB (PyMongo)
 - **Web Framework:** FastAPI
 - **Database:** MongoDB (via PyMongo)
 - **Auth:** OAuth2 + JWT (python-jose)
+- **Rate Limiting:** SlowAPI (based on Flask-Limiter)
 - **Email:** `smtplib` (SMTP)
 - **Testing:** pytest
 - **CI/CD:** GitHub Actions
@@ -124,6 +129,12 @@ uvicorn app.main:app --reload
 
 ---
 
+### Run with Docker
+
+```bash
+docker compose up --build -d
+```
+
 ## Usage
 
 ### Authentication
@@ -161,6 +172,18 @@ uvicorn app.main:app --reload
   GET /bookings
   ```
 
+### Rate Limits
+
+The API implements rate limiting to prevent abuse:
+
+- Registration: 5 attempts per hour per IP
+- Login: 10 attempts per minute per IP
+- Password Recovery: 3 requests per hour per IP
+- Password Reset: 5 requests per hour per IP
+- User Profile: 60 requests per minute per IP
+- Profile Updates: 30 requests per hour per IP
+- Password Changes: 5 requests per hour per IP
+
 ---
 
 ## Testing
@@ -169,6 +192,12 @@ Run the full test suite:
 
 ```bash
 pytest --maxfail=1 --disable-warnings -q
+```
+
+### with Docker
+
+```bash
+docker compose exec api pytest --maxfail=1 --disable-warnings -q
 ```
 
 ---

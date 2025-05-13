@@ -10,3 +10,4 @@ passlib[bcrypt]
 httpx
 email-validator
 python-multipart
+slowapi

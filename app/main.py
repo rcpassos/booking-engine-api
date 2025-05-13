@@ -1,7 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, Body, status
+from fastapi import FastAPI, Depends, HTTPException, Body, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from pydantic import EmailStr
+
+# Rate limiter imports
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.auth.jwt import ALGORITHM, create_access_token
@@ -16,15 +21,45 @@ from app.email import send_recovery_email
 from app.db import users
 from app.auth.api_key import get_api_key
 
+
+# Helper function to check if we're running in a test environment
+def is_test_environment():
+    import sys
+
+    return "pytest" in sys.modules
+
+
+# Initialize rate limiter with appropriate configuration
+if is_test_environment():
+    # In test environment, create a no-op rate limiter
+    # This creates a limiter that doesn't actually limit anything
+    class NoOpLimiter:
+        def limit(self, *args, **kwargs):
+            def inner(func):
+                return func
+
+            return inner
+
+    limiter = NoOpLimiter()
+else:
+    # In production, use the real rate limiter
+    limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Booking Engine",
     dependencies=[Depends(get_api_key)],
 )
 
+# Add rate limit handler (only needed in production)
+if not is_test_environment():
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 # -- Register --
 @app.post("/auth/register", response_model=UserOut, status_code=201)
-def register(data: UserIn):
+@limiter.limit("5/hour")  # Limit to 5 registrations per hour per IP
+def register(request: Request, data: UserIn):
     try:
         user = register_user(data)
     except ValueError as e:
@@ -39,7 +74,8 @@ def register(data: UserIn):
 
 # -- Login --
 @app.post("/auth/token")
-def login(form: OAuth2PasswordRequestForm = Depends()):
+@limiter.limit("10/minute")  # Limit to 10 login attempts per minute per IP
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
     user = users.find_one({"email": form.username})
     if not user or not verify_password(form.password, user["hashed_password"]):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
@@ -49,7 +85,8 @@ def login(form: OAuth2PasswordRequestForm = Depends()):
 
 # -- Recover password --
 @app.post("/auth/recover-password")
-def recover_password(email: EmailStr = Body(..., embed=True)):
+@limiter.limit("3/hour")  # Limit to 3 recovery emails per hour per IP
+def recover_password(request: Request, email: EmailStr = Body(..., embed=True)):
     user = users.find_one({"email": email})
     if not user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
@@ -63,7 +100,8 @@ def recover_password(email: EmailStr = Body(..., embed=True)):
 
 # -- Reset password --
 @app.post("/auth/reset-password")
-def reset_password(token: str, new_password: str):
+@limiter.limit("5/hour")  # Limit to 5 password resets per hour per IP
+def reset_password(request: Request, token: str, new_password: str):
     from jose import JWTError, jwt
 
     try:
@@ -77,7 +115,8 @@ def reset_password(token: str, new_password: str):
 
 # -- Get current user --
 @app.get("/users/me", response_model=UserOut)
-def read_profile(user_id: str = Depends(get_current_user)):
+@limiter.limit("60/minute")  # Limit to 60 requests per minute per IP
+def read_profile(request: Request, user_id: str = Depends(get_current_user)):
     u = users.find_one({"_id": user_id})
     return {
         "id": u["_id"],
@@ -89,7 +128,10 @@ def read_profile(user_id: str = Depends(get_current_user)):
 
 # -- Update profile --
 @app.put("/users/me", response_model=UserOut)
-def update_profile(data: UserUpdate, user_id: str = Depends(get_current_user)):
+@limiter.limit("30/hour")  # Limit to 30 profile updates per hour per IP
+def update_profile(
+    request: Request, data: UserUpdate, user_id: str = Depends(get_current_user)
+):
     updated = update_user(user_id, data.model_dump())
     return {
         "id": updated["_id"],
@@ -101,7 +143,10 @@ def update_profile(data: UserUpdate, user_id: str = Depends(get_current_user)):
 
 # -- Change password (authenticated) --
 @app.put("/users/me/password")
-def change_password(data: PasswordUpdate, user_id: str = Depends(get_current_user)):
+@limiter.limit("5/hour")  # Limit to 5 password changes per hour per IP
+def change_password(
+    request: Request, data: PasswordUpdate, user_id: str = Depends(get_current_user)
+):
     user = users.find_one({"_id": user_id})
     if not verify_password(data.old_password, user["hashed_password"]):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Old password incorrect")
@@ -111,12 +156,16 @@ def change_password(data: PasswordUpdate, user_id: str = Depends(get_current_use
 
 # --- Booking(Command) ---
 @app.post("/bookings", status_code=201)
-def create_booking(slot: str, user_id: str = Depends(get_current_user)):
+@limiter.limit("20/hour")  # Limit to 20 bookings per hour per IP
+def create_booking(
+    request: Request, slot: str, user_id: str = Depends(get_current_user)
+):
     booking = handle_create_booking(user_id, slot)
     return booking
 
 
 # --- Booking(Query) ---
 @app.get("/bookings", response_model=BookingList)
-def list_bookings(user_id: str = Depends(get_current_user)):
+@limiter.limit("60/minute")  # Limit to 60 requests per minute per IP
+def list_bookings(request: Request, user_id: str = Depends(get_current_user)):
     return handle_list_bookings(user_id)

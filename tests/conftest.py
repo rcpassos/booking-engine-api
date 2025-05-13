@@ -1,5 +1,6 @@
 import os
 import pytest
+from unittest.mock import patch
 from app.config import settings
 
 
@@ -9,6 +10,22 @@ def api_key_header() -> dict:
     Returns the header dict containing only the required x-api-key.
     """
     return {"x-api-key": settings.api_key}
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limit():
+    """Disable rate limiting for all tests"""
+
+    # Create a mock decorator that simply returns the function unchanged
+    def mock_decorator(*args, **kwargs):
+        def inner(func):
+            return func
+
+        return inner
+
+    # Replace the limiter.limit with our mock decorator
+    with patch("app.main.limiter.limit", mock_decorator):
+        yield
 
 
 @pytest.fixture(autouse=True)
