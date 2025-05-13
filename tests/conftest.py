@@ -1,5 +1,14 @@
 import os
 import pytest
+from app.config import settings
+
+
+@pytest.fixture
+def api_key_header() -> dict:
+    """
+    Returns the header dict containing only the required x-api-key.
+    """
+    return {"x-api-key": settings.api_key}
 
 
 @pytest.fixture(autouse=True)

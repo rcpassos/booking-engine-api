@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     smtp_user: str
     smtp_pass: str
     smtp_from_email: str
+    api_key: str
 
     class Config:
         env_file = ".env"

@@ -14,8 +14,12 @@ from app.models.user import UserIn, UserOut, UserUpdate, PasswordUpdate
 from app.models.booking import BookingList
 from app.email import send_recovery_email
 from app.db import users
+from app.auth.api_key import get_api_key
 
-app = FastAPI(title="Booking Engine")
+app = FastAPI(
+    title="Booking Engine",
+    dependencies=[Depends(get_api_key)],
+)
 
 
 # -- Register --
